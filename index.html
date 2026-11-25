@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Nuestro Hogar</title>
+<style>
+:root{--bg:#f6f4ef;--c:#fff;--t:#23262b;--m:#6b7280;--a:#2f7d6d;--l:#e5e1d8;--r:14px}
+:root[data-t=d]{--bg:#16181b;--c:#202328;--t:#eceef0;--m:#98a0aa;--a:#52b8a4;--l:#31353b}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--t);font:15px/1.4 system-ui,sans-serif;padding-bottom:70px}
+header{position:sticky;top:0;z-index:5;background:var(--bg);display:flex;align-items:center;gap:8px;padding:10px 14px;padding-top:max(10px,env(safe-area-inset-top))}
+header h1{font-size:18px;margin:0;flex:1}
+#st{font-size:12px;padding:3px 9px;border-radius:99px;background:var(--l);cursor:pointer}
+main{padding:0 14px 14px;max-width:720px;margin:auto}
+nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--c);border-top:1px solid var(--l);padding-bottom:env(safe-area-inset-bottom)}
+nav button{flex:1;border:0;background:none;color:var(--m);padding:8px 0;font-size:11px}nav button b{display:block;font-size:20px;font-weight:400}nav .on{color:var(--a)}
+.card{display:flex;align-items:center;gap:10px;background:var(--c);border-radius:var(--r);padding:10px 12px;margin:8px 0;border-left:4px solid var(--a)}
+.card.dn .g{text-decoration:line-through;opacity:.5}.g{flex:1;min-width:0}.g small{display:block;color:var(--m)}
+.box{background:var(--c);border-radius:var(--r);padding:12px;margin:10px 0}.box h3{margin:0 0 6px;font-size:14px;color:var(--m);text-transform:uppercase;letter-spacing:.04em}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.sp{flex:1}
+button.p,button.s{border:0;border-radius:10px;padding:9px 14px;font-size:14px;background:var(--a);color:#fff}button.s{background:var(--l);color:var(--t)}
+button.ic{border:0;background:none;font-size:16px;padding:4px}
+.chip{border:1px solid var(--l);background:none;color:var(--t);border-radius:99px;padding:5px 12px;font-size:13px}.chip.on{background:var(--a);color:#fff;border-color:var(--a)}
+.chips{display:flex;gap:6px;overflow-x:auto;padding:4px 0}
+input,select,textarea{width:100%;padding:9px;border:1px solid var(--l);border-radius:9px;background:var(--bg);color:var(--t);font:inherit}
+input[type=checkbox]{width:20px;height:20px;flex:none}label{display:block;font-size:13px;color:var(--m);margin:8px 0}
+#modal{position:fixed;inset:0;background:#0008;display:none;align-items:flex-end;z-index:9}
+#modal.on{display:flex}#modal>div{background:var(--c);width:100%;max-height:92vh;overflow:auto;border-radius:18px 18px 0 0;padding:16px;max-width:720px;margin:auto}
+#toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#222;color:#fff;padding:8px 14px;border-radius:99px;font-size:13px;display:none;z-index:20}
+.th{width:48px;height:48px;object-fit:cover;border-radius:8px;background:var(--l)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:8px}.grid img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:10px;background:var(--l)}
+.tile{background:var(--c);border:0;border-radius:var(--r);padding:16px 6px;color:var(--t);font-size:13px}.tile b{display:block;font-size:26px;font-weight:400}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;text-align:center}.cal div{padding:7px 0;border-radius:8px;font-size:13px;position:relative}.cal .h{color:var(--m);font-size:11px}
+.cal .d{background:var(--c)}.cal .t{outline:2px solid var(--a)}.cal .s{background:var(--a);color:#fff}.cal i{position:absolute;bottom:2px;left:50%;width:5px;height:5px;margin-left:-2px;border-radius:50%;background:#e0568a}
+.bar{height:8px;background:var(--l);border-radius:9px;overflow:hidden}.bar i{display:block;height:100%;background:var(--a)}.bar.x i{background:#d9534f}
+.tag{font-size:10px;background:#f5a623;color:#000;border-radius:5px;padding:1px 5px}.empty{text-align:center;color:var(--m);padding:26px 10px}
+.warn{background:#f5a62322;border-radius:10px;padding:8px;font-size:13px}table{width:100%;border-collapse:collapse;font-size:13px}td,th{border-bottom:1px solid var(--l);padding:5px;text-align:left;vertical-align:top}
+</style></head><body>
+<header><h1 id="ti">Nuestro Hogar</h1><span id="st" onclick="sync()"></span></header>
+<main id="v"></main><nav id="nav"></nav><div id="modal"></div><div id="toast"></div>
+<script>
+'use strict';
+/* ============ UTILIDADES ============ */
+const KEY='nh_v1',$=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const iso=d=>{const z=new Date(d);return z.getFullYear()+'-'+String(z.getMonth()+1).padStart(2,'0')+'-'+String(z.getDate()).padStart(2,'0')};
+const today=()=>iso(new Date()),addD=(s,n)=>{const d=new Date(s+'T00:00');d.setDate(d.getDate()+n);return iso(d)};
+const fmt=s=>s?new Date(s+'T00:00').toLocaleDateString('es-MX',{weekday:'short',day:'numeric',month:'short'}):'';
+const money=n=>(+n||0).toLocaleString('es-MX',{style:'currency',currency:'MXN'});
+const DAYS=['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+function toast(t){const e=$('#toast');e.textContent=t;e.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>e.style.display='none',2600)}
+/* ============ ESTADO LOCAL ============ */
+let DB=(()=>{try{const d=JSON.parse(localStorage.getItem(KEY));if(d)return d}catch(e){}
+ return{users:[{id:'u1',name:'Yo',color:'#2f80ed'},{id:'u2',name:'Esposa',color:'#e0568a'}],me:'u1',dark:null,data:{},q:[],int:{},last:null}})();
+function save(){try{localStorage.setItem(KEY,JSON.stringify(DB))}catch(e){toast('Almacenamiento lleno')}status()}
+/* Archivos (fotos/documentos) en IndexedDB: nunca en localStorage ni en Sheets */
+const IDB={p:null,open(){return this.p||(this.p=new Promise((a,b)=>{const r=indexedDB.open('nh_files',1);r.onupgradeneeded=()=>r.result.createObjectStore('f');r.onsuccess=()=>a(r.result);r.onerror=()=>b(r.error)}))},
+ async tx(m,fn){const d=await this.open();return new Promise((a,b)=>{const t=d.transaction('f',m),q=fn(t.objectStore('f'));t.oncomplete=()=>a(q&&q.result);t.onerror=()=>b(t.error)})},
+ put(k,v){return this.tx('readwrite',s=>s.put(v,k))},get(k){return this.tx('readonly',s=>s.get(k))},del(k){return this.tx('readwrite',s=>s.delete(k))}};
+/* ============ MÓDULOS (esquema -> hoja de Google Sheets) ============ */
+const CAT={ev:['Familia','Trabajo','Escuela','Salud','Otro'],task:['Hogar','Limpieza','Compras','Familia','Personal','Otros'],shop:['Frutas y verduras','Carnes','Lácteos','Despensa','Limpieza','Higiene personal','Otros'],
+ exp:['Supermercado','Servicios','Transporte','Vivienda','Salud','Educación','Entretenimiento','Restaurantes','Otros'],img:['Menús','Información familiar','Escuela','Hogar','Referencias','Otros'],doc:['Identificaciones','Escuela','Salud','Hogar','Finanzas','Otros']};
+const W=()=>DB.users.map(u=>[u.id,u.name]).concat([['both','Ambos']]);
+const uName=id=>id==='both'?'Ambos':(DB.users.find(u=>u.id===id)||{}).name||'';
+const uCol=id=>(DB.users.find(u=>u.id===id)||{}).color||'var(--a)';
+const REC=['No','Semanal','Mensual','Anual'];
+/* campo: [clave,etiqueta,tipo,opciones,requerido] */
+const M={
+events:{s:'Events',t:'Evento',i:'📅',f:[['title','Título','text',0,1],['date','Fecha','date',0,1],['time','Hora','time'],['who','Para','who'],['cat','Categoría','sel',CAT.ev],['rec','Se repite','sel',REC],['rem','Recordatorio','sel',['Ninguno','15 min','1 hora','1 día']],['note','Notas','area']],r:x=>[x.title,fmt(x.date)+(x.time?' · '+x.time:'')+' · '+x.cat]},
+tasks:{s:'Tasks',t:'Tarea',i:'✅',chk:1,f:[['title','Tarea','text',0,1],['who','Responsable','who'],['due','Fecha límite','date'],['prio','Prioridad','sel',['Media','Alta','Baja']],['cat','Categoría','sel',CAT.task],['rec','Se repite','sel',REC]],r:x=>[x.title,[x.prio,x.cat,x.due&&'vence '+fmt(x.due),x.done&&'hecha '+fmt(x.doneAt)].filter(Boolean).join(' · ')]},
+shop:{s:'ShoppingItems',t:'Producto',i:'🛒',chk:1,f:[['name','Producto','text',0,1],['qty','Cantidad','text'],['list','Lista','text'],['cat','Categoría','sel',CAT.shop]],r:x=>[x.name,[x.qty,x.cat,'por '+uName(x.by)].filter(Boolean).join(' · ')]},
+recipes:{s:'Recipes',t:'Receta',i:'🍲',img:'photo',f:[['name','Nombre','text',0,1],['photo','Fotografía','file','image/*'],['time','Minutos','number'],['portions','Porciones','number'],['cat','Categoría','text'],['ing','Ingredientes (uno por línea, con cantidad)','area'],['steps','Preparación','area'],['fav','Favorita','check']],r:x=>[(x.fav?'★ ':'')+x.name,[x.time&&x.time+' min',x.portions&&x.portions+' porc.',x.cat].filter(Boolean).join(' · ')]},
+meals:{s:'MealPlans',t:'Comida',i:'🍽️',img:'photo',f:[['date','Día','date',0,1],['slot','Momento','sel',['Desayuno','Comida','Cena','Colación']],['name','Platillo','text',0,1],['recipe','Usar receta','sel',()=>['—',...(DB.data.recipes||[]).map(r=>r.name)]],['photo','Fotografía','file','image/*'],['ing','Ingredientes (uno por línea)','area']],r:x=>[x.name,x.slot+' · '+fmt(x.date)],
+  on(r){if(r.recipe&&r.recipe!=='—'&&!r.ing){const q=(DB.data.recipes||[]).find(a=>a.name===r.recipe);if(q)r.ing=q.ing||''}},
+  x:x=>`<button class="ic" title="Ingredientes a compras" onclick="toShop('${x.id}')">🛒</button><button class="ic" title="Duplicar" onclick="dup('${x.id}')">⧉</button>`},
+exp:{s:'Expenses',t:'Movimiento',i:'💰',f:[['type','Tipo','sel',['Gasto','Ingreso']],['amount','Monto','number',0,1],['cat','Categoría','sel',CAT.exp],['date','Fecha','date',0,1],['who','Responsable','who'],['shared','Gasto compartido','check'],['note','Nota','text']],r:x=>[(x.type==='Ingreso'?'+ ':'− ')+money(x.amount),[x.cat,fmt(x.date),x.note].filter(Boolean).join(' · ')]},
+budgets:{s:'Budgets',t:'Presupuesto',i:'🎯',f:[['cat','Categoría','sel',CAT.exp],['limit','Límite mensual','number',0,1]],r:x=>[x.cat,'Límite '+money(x.limit)]},
+docs:{s:'Documents',t:'Documento',i:'📄',f:[['title','Título','text',0,1],['cat','Categoría','sel',CAT.doc],['file','Archivo','file','',1],['desc','Descripción','area']],r:x=>[x.title,[x.cat,fmt((x.created||'').slice(0,10)),'subió '+uName(x.by)].join(' · ')],x:x=>`<button class="ic" onclick="openF('${x.id}','file')">⬇</button>`},
+images:{s:'Images',t:'Imagen',i:'🖼️',img:'file',f:[['title','Título','text',0,1],['cat','Categoría','sel',CAT.img],['file','Foto (galería o cámara)','file','image/*',1],['desc','Descripción','area']],r:x=>[x.title,[x.cat,fmt((x.created||'').slice(0,10)),uName(x.by)].join(' · ')]},
+sched:{s:'Schedules',t:'Horario',i:'🕒',f:[['title','Actividad','text',0,1],['who','Integrante','who'],['day','Día','sel',DAYS],['start','Inicio','time'],['end','Fin','time'],['kind','Tipo','sel',['Trabajo','Escuela','Actividad','Otro']],['alt','Horario alterno','check']],r:x=>[x.title,x.day+' '+(x.start||'')+'–'+(x.end||'')+' · '+x.kind+(x.alt?' (alterno)':'')]},
+special:{s:'SpecialDays',t:'Fecha especial',i:'🎂',f:[['title','Nombre','text',0,1],['date','Fecha','date',0,1],['kind','Tipo','sel',['Cumpleaños','Aniversario','Otro']],['who','De','who']],r:x=>[x.title,x.kind+' · '+fmt(x.date)+' · '+dleft(x)]}
+};
+/* ============ FECHAS Y RECURRENCIA ============ */
+function occ(e,from){const d=e.date||e.due;if(!d)return null;if(d>=from)return d;const r=e.rec||'No';if(r==='No')return null;const b=new Date(d+'T00:00'),f=new Date(from+'T00:00');
+ if(r==='Anual'){const x=new Date(f.getFullYear(),b.getMonth(),b.getDate());if(x<f)x.setFullYear(x.getFullYear()+1);return iso(x)}
+ if(r==='Mensual'){const x=new Date(f.getFullYear(),f.getMonth(),b.getDate());if(x<f)x.setMonth(x.getMonth()+1);return iso(x)}
+ const n=Math.ceil((f-b)/864e5/7),x=new Date(b);x.setDate(b.getDate()+n*7);return iso(x)}
+const sp=x=>({date:x.date,rec:'Anual'});
+function dleft(x){const o=occ(sp(x),today());if(!o)return '';const n=Math.round((new Date(o+'T00:00')-new Date(today()+'T00:00'))/864e5);return n===0?'¡hoy!':'faltan '+n+' d'}
+const L=m=>DB.data[m]||(DB.data[m]=[]);
+function onDay(d){return[...L('events').filter(e=>occ(e,d)===d).map(e=>({...e,k:'e'})),...L('special').filter(e=>occ(sp(e),d)===d).map(e=>({...e,k:'s'})),...L('tasks').filter(t=>!t.done&&t.due===d).map(e=>({...e,k:'t'}))]}
+/* ============ CRUD + COLA DE SINCRONIZACIÓN ============ */
+function enq(op,m,rec){DB.q=DB.q.filter(o=>!(o.id===rec.id&&o.sheet===M[m].s));DB.q.push({op,sheet:M[m].s,id:rec.id,rec:op==='delete'?null:rec,t:Date.now()})}
+function upsert(m,rec){const l=L(m),i=l.findIndex(x=>x.id===rec.id),now=new Date().toISOString();let r=rec;
+ if(i<0){rec.created=now;rec.by=DB.me;l.push(rec)}else r=Object.assign(l[i],rec);r.updated=now;enq('upsert',m,r);save();return r}
+async function del(m,id){if(!confirm('¿Eliminar este registro? No se puede deshacer.'))return;const x=L(m).find(a=>a.id===id);
+ for(const k in(x.files||{}))await IDB.del(id+':'+k);DB.data[m]=L(m).filter(a=>a.id!==id);enq('delete',m,{id});save();render()}
+function tog(m,id){const x=L(m).find(a=>a.id===id);x.done=!x.done;x.doneAt=x.done?today():'';
+ if(m==='tasks'&&x.done&&x.rec&&x.rec!=='No'&&x.due){const n=occ({date:x.due,rec:x.rec},addD(x.due,1));upsert('tasks',{id:uid(),title:x.title,who:x.who,due:n,prio:x.prio,cat:x.cat,rec:x.rec})}
+ upsert(m,x);render()}
+function openForm(m,id,pre){const d=M[m],x=id?L(m).find(a=>a.id===id):Object.assign({},pre);
+ const h=d.f.map(([k,l,t,o,q])=>{const op=typeof o==='function'?o():o;let v=x[k]??(t==='sel'?op[0]:t==='who'?DB.me:t==='date'&&q?today():''),c;
+  if(t==='sel')c=`<select name="${k}">${op.map(a=>`<option ${a==v?'selected':''}>${esc(a)}</option>`).join('')}</select>`;
+  else if(t==='who')c=`<select name="${k}">${W().map(([a,b])=>`<option value="${a}" ${a==v?'selected':''}>${esc(b)}</option>`).join('')}</select>`;
+  else if(t==='area')c=`<textarea name="${k}" rows="3">${esc(v)}</textarea>`;
+  else if(t==='check')c=`<input type="checkbox" name="${k}" ${v?'checked':''}>`;
+  else if(t==='file')c=`<input type="file" name="${k}" accept="${op||'*/*'}" ${q&&!(x.files||{})[k]?'required':''}>`+((x.files||{})[k]?`<small>Actual: ${esc(x.files[k].name)}</small>`:'');
+  else c=`<input name="${k}" type="${t}" value="${esc(v)}" ${t==='number'?'step="any" inputmode="decimal"':''} ${q?'required':''}>`;
+  return`<label>${l}${c}</label>`}).join('');
+ $('#modal').innerHTML=`<div><form id="f"><h3>${id?'Editar':'Nuevo'}: ${d.t}</h3>${h}<div class="row" style="margin-top:12px"><button class="p">Guardar</button><button type="button" class="s" onclick="closeM()">Cancelar</button></div></form></div>`;
+ $('#modal').classList.add('on');
+ $('#f').onsubmit=async e=>{e.preventDefault();const fd=new FormData(e.target),r=Object.assign({},x,{id:x.id||uid()});r.files=Object.assign({},x.files);
+  for(const[k,l,t]of d.f){if(t==='check')r[k]=fd.get(k)==='on';else if(t==='number')r[k]=parseFloat(fd.get(k))||0;else if(t==='file'){const f=fd.get(k);if(f&&f.size){await IDB.put(r.id+':'+k,f);r.files[k]={name:f.name,type:f.type,size:f.size}}}else r[k]=fd.get(k)}
+  if(d.on)d.on(r);if(m==='shop'&&!r.list)r.list=S.list||'Súper';upsert(m,r);closeM();render()}}
+const closeM=()=>$('#modal').classList.remove('on'),edit=(m,id)=>openForm(m,id);
+async function openF(id,k){const x=Object.values(DB.data).flat().find(a=>a.id===id),f=x.files[k],b=await IDB.get(id+':'+k);
+ if(!b){if(f.driveId)return window.open('https://drive.google.com/file/d/'+f.driveId+'/view');return toast('Archivo no disponible en este dispositivo')}
+ const u=URL.createObjectURL(b);if(f.type.startsWith('image/')){$('#modal').innerHTML=`<div style="text-align:center"><img src="${u}" style="max-width:100%;max-height:75vh"><p><b>${esc(x.title||'')}</b><br><small>${esc(x.desc||'')}</small></p><button class="s" onclick="closeM()">Cerrar</button></div>`;$('#modal').classList.add('on')}
+ else{const a=document.createElement('a');a.href=u;a.download=f.name;a.click()}}
+function thumbs(){document.querySelectorAll('img[data-fk]').forEach(async el=>{try{const b=await IDB.get(el.dataset.fk);if(b)el.src=URL.createObjectURL(b);else if(el.dataset.d)el.src='https://drive.google.com/thumbnail?id='+el.dataset.d}catch(e){}})}
+/* ============ ADAPTADORES (Apps Script / Drive) — no hacen nada sin configurar ============ */
+const Sync={c(){const c=DB.int.sheets||{};return c.on&&c.url&&c.token?c:null},
+ async call(op,p){const c=this.c();if(!c)throw Error('Pendiente de configurar (Configuración > Integraciones)');
+  const r=await fetch(c.url,{method:'POST',body:JSON.stringify(Object.assign({token:c.token,sheetId:c.sheetId,op},p))});if(!r.ok)throw Error('HTTP '+r.status);const j=await r.json();if(!j.ok)throw Error(j.error||'Error del servicio');return j},
+ async push(){const ops=DB.q.slice();if(!ops.length)return;
+  for(const o of ops)if(o.rec&&o.rec.files)for(const k in o.rec.files){const f=o.rec.files[k];if(!f.driveId&&Drive.on()){const b=await IDB.get(o.id+':'+k);if(b)f.driveId=(await Drive.upload(b,f.name,o.sheet)).fileId}}
+  await this.call('batch',{ops:ops.map(o=>({op:o.op,sheet:o.sheet,id:o.id,record:o.rec}))});DB.q=DB.q.filter(o=>!ops.includes(o));DB.last=new Date().toISOString();save()},
+ async pull(){const j=await this.call('pullAll',{});for(const m in M){const rs=(j.data||{})[M[m].s];if(!rs)continue;rs.forEach(r=>{const l=L(m),i=l.findIndex(a=>a.id===r.id);if(DB.q.some(o=>o.id===r.id))return;if(i<0)l.push(r);else if((r.updated||'')>(l[i].updated||''))l[i]=Object.assign(l[i],r)})}DB.last=new Date().toISOString();save()}};
+const Drive={on(){const c=DB.int.drive;return Sync.c()&&c&&c.on&&c.folderId},
+ async upload(b,name,sheet){const data=await new Promise(a=>{const r=new FileReader();r.onload=()=>a(r.result.split(',')[1]);r.readAsDataURL(b)});return Sync.call('uploadFile',{name,mime:b.type,folder:DB.int.drive.folderId,subfolder:sheet,data})}};
+async function sync(){if(!Sync.c())return toast('Modo local: configura Apps Script para sincronizar');
+ try{toast('Sincronizando…');await Sync.push();await Sync.pull();toast('Sincronizado');render()}catch(e){toast('Falló la sincronización: '+e.message)}}
+function status(){const e=$('#st');if(!e)return;const c=Sync.c();e.textContent=!c?'📱 Solo en este dispositivo':DB.q.length?'⏳ '+DB.q.length+' pendientes':DB.last?'✔ Sincronizado '+new Date(DB.last).toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'}):'☁ Sin sincronizar'}
+/* ============ VISTAS ============ */
+const S={v:'home',cal:{y:new Date().getFullYear(),m:new Date().getMonth(),sel:today(),mode:'Mes'},tf:'Todas',ts:'Pendientes',list:'',hist:0,mo:today().slice(0,7),wk:0};
+const NAV=[['home','🏠','Inicio'],['cal','📅','Agenda'],['tasks','✅','Tareas'],['shop','🛒','Compras'],['exp','💰','Gastos'],['more','☰','Más']];
+function go(v,a){S.v=v;if(a)Object.assign(S,a);render();scrollTo(0,0)}
+const empty=t=>`<div class="empty">${t}</div>`;
+const head=(t,m,pre)=>`<div class="row"><h2 class="sp" style="margin:12px 0">${t}</h2>${m?`<button class="p" onclick='openForm("${m}",null,${JSON.stringify(pre||{})})'>+ Nuevo</button>`:''}</div>`;
+const who=x=>`<span style="color:${uCol(x.who||x.by)}">●</span>`;
+function card(m,x){const d=M[m],[a,b]=d.r(x);
+ return`<div class="card" style="border-left-color:${uCol(x.who||x.by)}">${d.chk?`<input type=checkbox ${x.done?'checked':''} onchange="tog('${m}','${x.id}')">`:''}${d.img&&(x.files||{})[d.img]?`<img class="th" data-fk="${x.id}:${d.img}" data-d="${x.files[d.img].driveId||''}" alt="" onclick="openF('${x.id}','${d.img}')">`:''}<div class="g" onclick="edit('${m}','${x.id}')"><b>${esc(a)}</b>${x.demo?' <span class="tag">DEMO</span>':''}<small>${esc(b)}</small></div>${d.x?d.x(x):''}<button class="ic" onclick="del('${m}','${x.id}')">🗑</button></div>`}
+const V={
+home(){const t=today(),ev=[];for(let i=0;i<14;i++)onDay(addD(t,i)).forEach(e=>e.k!=='t'&&ev.push([addD(t,i),e]));
+ const tk=L('tasks').filter(x=>!x.done).sort((a,b)=>(a.due||'9')>(b.due||'9')?1:-1).slice(0,5),mo=t.slice(0,7),ex=L('exp').filter(x=>(x.date||'').startsWith(mo)),g=ex.filter(x=>x.type!=='Ingreso').reduce((a,x)=>a+x.amount,0),
+ ml=L('meals').filter(x=>x.date>=t&&x.date<=addD(t,1)).sort((a,b)=>a.date>b.date?1:-1),sh=L('shop').filter(x=>!x.done&&!x.arch).length,sd=L('special').filter(x=>{const o=occ(sp(x),t);return o&&o<=addD(t,30)}).sort((a,b)=>occ(sp(a),t)>occ(sp(b),t)?1:-1);
+ return`<h2 style="margin:6px 0">${new Date().toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'long'})}</h2>
+ <div class="box"><h3>Próximos eventos</h3>${ev.slice(0,5).map(([d,e])=>`<div>${who(e)} <b>${esc(e.title)}</b> <small>${fmt(d)} ${e.time||''}</small></div>`).join('')||empty('Sin eventos próximos')}</div>
+ <div class="box"><h3>Tareas pendientes</h3>${tk.map(x=>`<div>${who(x)} ${esc(x.title)} <small>${x.due?fmt(x.due):''}</small></div>`).join('')||empty('Nada pendiente')}</div>
+ <div class="row"><div class="box sp"><h3>Gastos del mes</h3><b style="font-size:20px">${money(g)}</b></div><div class="box sp" onclick="go('shop')"><h3>Por comprar</h3><b style="font-size:20px">${sh}</b></div></div>
+ <div class="box"><h3>Comidas hoy y mañana</h3>${ml.map(x=>`<div>${esc(x.slot)}: ${esc(x.name)} <small>${fmt(x.date)}</small></div>`).join('')||empty('Sin comidas planeadas')}</div>
+ <div class="box"><h3>Fechas especiales (30 días)</h3>${sd.map(x=>`<div>${esc(x.title)} <small>${dleft(x)}</small></div>`).join('')||empty('Ninguna próxima')}</div>
+ ${!Object.values(DB.data).flat().length?`<div class="warn">Aún no hay datos. Puedes empezar a registrar o cargar datos de demostración en Más › Configuración.</div>`:''}`},
+cal(){const c=S.cal,first=new Date(c.y,c.m,1),pad=(first.getDay()+6)%7,n=new Date(c.y,c.m+1,0).getDate();let cells=DAYS.map(d=>`<div class="h">${d}</div>`).join('')+'<div></div>'.repeat(pad);
+ for(let i=1;i<=n;i++){const d=iso(new Date(c.y,c.m,i));cells+=`<div class="d ${d===today()?'t':''} ${d===c.sel?'s':''}" onclick="S.cal.sel='${d}';render()">${i}${onDay(d).length?'<i></i>':''}</div>`}
+ const days=c.mode==='Semana'?(()=>{const b=new Date(c.sel+'T00:00');b.setDate(b.getDate()-(b.getDay()+6)%7);return[...Array(7)].map((_,i)=>{const d=new Date(b);d.setDate(b.getDate()+i);return iso(d)})})():[c.sel];
+ return head('Agenda','events',{date:c.sel})+`<div class="chips">${['Mes','Semana','Día'].map(m=>`<button class="chip ${c.mode===m?'on':''}" onclick="S.cal.mode='${m}';render()">${m}</button>`).join('')}</div>
+ ${c.mode==='Mes'?`<div class="row"><button class="s" onclick="mv(-1)">‹</button><b class="sp" style="text-align:center">${first.toLocaleDateString('es-MX',{month:'long',year:'numeric'})}</b><button class="s" onclick="mv(1)">›</button></div><div class="cal" style="margin:8px 0">${cells}</div>`:''}
+ ${days.map(d=>`<div class="box"><h3>${fmt(d)}</h3>${onDay(d).map(e=>e.k==='e'?card('events',e):e.k==='s'?`<div class="card">🎂 ${esc(e.title)}</div>`:`<div class="card">✅ ${esc(e.title)}</div>`).join('')||empty('Sin actividades')}</div>`).join('')}
+ ${L('sched').filter(s=>!s.alt).length?`<div class="box"><h3>Horarios de hoy</h3>${L('sched').filter(s=>s.day===DAYS[(new Date(c.sel+'T00:00').getDay()+6)%7]&&!s.alt).map(s=>`<div>${who(s)} ${esc(s.title)} <small>${s.start||''}–${s.end||''}</small></div>`).join('')}</div>`:''}`},
+tasks(){let l=L('tasks').filter(x=>(S.tf==='Todas'||x.who===S.tf||x.who==='both')&&(S.ts==='Todas'||(S.ts==='Hechas')===!!x.done));l.sort((a,b)=>(a.due||'9')>(b.due||'9')?1:-1);
+ return head('Tareas','tasks')+`<div class="chips">${['Todas',...DB.users.map(u=>u.id)].map(u=>`<button class="chip ${S.tf===u?'on':''}" onclick="S.tf='${u}';render()">${u==='Todas'?u:esc(uName(u))}</button>`).join('')}|${['Pendientes','Hechas','Todas'].map(u=>`<button class="chip ${S.ts===u?'on':''}" onclick="S.ts='${u}';render()">${u}</button>`).join('')}</div>${l.map(x=>card('tasks',x)).join('')||empty('Sin tareas')}`},
+shop(){const ls=[...new Set(L('shop').map(x=>x.list||'Súper'))];if(!S.list||!ls.includes(S.list))S.list=ls[0]||'Súper';
+ const l=L('shop').filter(x=>(x.list||'Súper')===S.list&&!!x.arch===!!S.hist);
+ return head('Compras','shop',{list:S.list})+`<div class="chips">${ls.map(x=>`<button class="chip ${S.list===x?'on':''}" onclick="S.list='${esc(x)}';render()">${esc(x)}</button>`).join('')}<button class="chip" onclick="newList()">+ lista</button></div>
+ <div class="row"><button class="s" onclick="S.hist=${S.hist?0:1};render()">${S.hist?'Ver pendientes':'Ver historial'}</button><button class="s" onclick="arch()">Archivar comprados</button></div>
+ ${CAT.shop.map(c=>{const a=l.filter(x=>x.cat===c);return a.length?`<h3 style="color:var(--m);margin:12px 0 0">${c}</h3>`+a.map(x=>card('shop',x)).join(''):''}).join('')||empty('Lista vacía')}`},
+exp(){const mo=S.mo,l=L('exp').filter(x=>(x.date||'').startsWith(mo)),pm=iso(new Date(+mo.slice(0,4),+mo.slice(5)-2,1)).slice(0,7),sum=(a,t)=>a.filter(x=>x.type===t).reduce((s,x)=>s+x.amount,0),
+ g=sum(l,'Gasto'),i=sum(l,'Ingreso'),pg=sum(L('exp').filter(x=>(x.date||'').startsWith(pm)),'Gasto');
+ return head('Gastos','exp')+`<div class="row"><button class="s" onclick="mm(-1)">‹</button><b class="sp" style="text-align:center">${mo}</b><button class="s" onclick="mm(1)">›</button></div>
+ <div class="box"><div class="row"><div class="sp">Ingresos<br><b>${money(i)}</b></div><div class="sp">Gastos<br><b>${money(g)}</b></div><div class="sp">Balance<br><b>${money(i-g)}</b></div></div><small>Mes anterior: ${money(pg)} (${g>=pg?'+':''}${money(g-pg)})</small></div>
+ <div class="box"><h3>Por categoría</h3>${CAT.exp.map(c=>{const t=sum(l.filter(x=>x.cat===c),'Gasto'),b=L('budgets').find(x=>x.cat===c);return t||b?`<div>${c}: ${money(t)}${b?' / '+money(b.limit):''}<div class="bar ${b&&t>b.limit?'x':''}"><i style="width:${Math.min(100,b?t/b.limit*100:100)}%"></i></div></div>`:''}).join('')||empty('Sin movimientos')}</div>
+ <div class="box"><h3>Por integrante</h3>${DB.users.map(u=>`<div>${esc(u.name)}: ${money(sum(l.filter(x=>x.who===u.id),'Gasto'))}</div>`).join('')}<div>Compartidos: ${money(sum(l.filter(x=>x.shared),'Gasto'))}</div></div>
+ <button class="s" onclick="go('list',{m:'budgets'})">🎯 Presupuestos por categoría</button>${l.sort((a,b)=>a.date<b.date?1:-1).map(x=>card('exp',x)).join('')}`},
+more(){return`<h2>Más</h2><div class="grid" style="grid-template-columns:repeat(3,1fr)">${[['recipes','🍲','Recetas'],['meals','🍽️','Comidas'],['images','🖼️','Galería'],['docs','📄','Documentos'],['sched','🕒','Horarios'],['special','🎂','Fechas'],['guide','📍','Ubicación y Median'],['int','🔌','Integraciones'],['cfg','⚙️','Ajustes']].map(([v,i,t])=>`<button class="tile" onclick="go('${['recipes','meals','images','docs','sched','special'].includes(v)?'list':v}',${['recipes','meals','images','docs','sched','special'].includes(v)?`{m:'${v}'}`:'null'})"><b>${i}</b>${t}</button>`).join('')}</div>`},
+list(){const m=S.m,d=M[m];if(m==='meals')return V.meals();let l=L(m).slice().reverse(),h=head(d.i+' '+d.t+'s',m);
+ if(m==='images')return h+(l.length?`<div class="grid">${l.map(x=>`<div><img data-fk="${x.id}:file" data-d="${(x.files.file||{}).driveId||''}" onclick="openF('${x.id}','file')" alt=""><small>${esc(x.title)}</small></div>`).join('')}</div>`:empty('Sube fotos de menús, avisos o instrucciones'));
+ if(m==='sched')return h+DAYS.map(dd=>{const a=l.filter(x=>x.day===dd).sort((p,q)=>(p.start||'')>(q.start||'')?1:-1);return a.length?`<h3>${dd}</h3>`+a.map(x=>card(m,x)).join(''):''}).join('')||h+empty('Sin horarios');
+ if(m==='special')l.sort((a,b)=>occ(sp(a),today())>occ(sp(b),today())?1:-1);
+ return h+(l.map(x=>card(m,x)).join('')||empty('Aún no hay registros'))},
+meals(){const b=addD(today(),S.wk*7-((new Date().getDay()+6)%7));
+ return head('🍽️ Comidas','meals')+`<div class="row"><button class="s" onclick="S.wk--;render()">‹</button><b class="sp" style="text-align:center">Semana de ${fmt(b)}</b><button class="s" onclick="S.wk++;render()">›</button></div>`+[...Array(7)].map((_,i)=>{const d=addD(b,i);return`<div class="box"><div class="row"><h3 class="sp">${fmt(d)}</h3><button class="s" onclick='openForm("meals",null,{date:"${d}"})'>+</button></div>${L('meals').filter(x=>x.date===d).sort((p,q)=>p.slot>q.slot?1:-1).map(x=>card('meals',x)).join('')}</div>`}).join('')},
+guide(){return`<h2>Ubicación, notificaciones y Median.co</h2><div class="warn">Pendiente de configuración: la ubicación familiar, las alertas de llegada/salida y las notificaciones requieren plugins nativos de Median. Esta versión no simula GPS ni notificaciones.</div>
+ <div class="box"><table><tr><th>Módulo</th><th>Plugin / permiso (Median)</th></tr><tr><td>Galería y documentos</td><td>Cámara y archivos (File/Photo Upload)</td></tr><tr><td>Ubicación</td><td>Location / GPS (+ fondo si se desea)</td></tr><tr><td>Notificaciones</td><td>OneSignal, Firebase o notificaciones locales</td></tr><tr><td>Credenciales</td><td>Secure Storage</td></tr><tr><td>Calendario nativo</td><td>Calendar plugin</td></tr><tr><td>Escáner de códigos</td><td>Barcode Scanner</td></tr></table></div>
+ <div class="box"><h3>Documentación de configuración</h3><ol><li>Crear una hoja de Google con las pestañas: Users, Events, Tasks, ShoppingLists, ShoppingItems, Recipes, MealPlans, Expenses, Budgets, Documents, Images, Schedules, SpecialDays, Settings, ActivityLog.</li><li>Crear en Drive la carpeta FamilyWall/ (Images, Menus, Documents, Recipes, Profiles) y compartirla.</li><li>Publicar un Apps Script (pendiente) que acepte POST JSON con <code>token</code> y las operaciones <code>ping, batch, pullAll, uploadFile, driveCheck</code>.</li><li>Pegar URL, ID y token en Integraciones.</li></ol></div>`},
+int(){return`<h2>Integraciones</h2><div class="warn">Las credenciales se guardan solo en este dispositivo (localStorage no es almacenamiento seguro). En Median usa Secure Storage. No publiques claves en GitHub.</div>`+INT.map(([id,n,fs,t])=>{const c=DB.int[id]||{};return`<div class="box"><div class="row"><b class="sp">${n}</b><label style="margin:0"><input type="checkbox" ${c.on?'checked':''} onchange="ic('${id}','on',this.checked)"></label></div><small>${esc(c.st||'No configurado')}</small>${fs.map(([k,l,p])=>`<label>${l}<input ${p?'type="password"':''} value="${esc(c[k]||'')}" onchange="ic('${id}','${k}',this.value)"></label>`).join('')}<div class="row"><button class="s" onclick="tst('${id}')">Probar conexión</button><button class="s" onclick="rmI('${id}')">Eliminar</button></div></div>`}).join('')},
+cfg(){return`<h2>Ajustes</h2>${DB.users.map((u,i)=>`<div class="box"><b>Integrante ${i+1}</b><label>Nombre<input value="${esc(u.name)}" onchange="DB.users[${i}].name=this.value;save()"></label><label>Color<input type="color" value="${u.color}" onchange="DB.users[${i}].color=this.value;save()"></label></div>`).join('')}
+ <div class="box"><label>Este teléfono es de<select onchange="DB.me=this.value;save()">${DB.users.map(u=>`<option value="${u.id}" ${DB.me===u.id?'selected':''}>${esc(u.name)}</option>`).join('')}</select></label>
+ <label>Tema<select onchange="DB.dark=this.value==='auto'?null:this.value==='d';save();theme()"><option value="auto">Automático</option><option value="l" ${DB.dark===false?'selected':''}>Claro</option><option value="d" ${DB.dark?'selected':''}>Oscuro</option></select></label></div>
+ <div class="box row"><button class="s" onclick="demo()">Cargar datos de demostración</button><button class="s" onclick="expJ()">Exportar respaldo</button><button class="s" onclick="delDemo()">Quitar demostración</button></div>`}};
+const INT=[['sheets','Google Sheets + Apps Script',[['url','URL del Apps Script (/exec)'],['sheetId','ID de la hoja'],['token','Token de acceso',1],['apiKey','API Key opcional (solo lectura)',1]]],['drive','Google Drive',[['folderId','ID de carpeta raíz FamilyWall']]],['gcal','Google Calendar (OAuth)',[['clientId','Client ID']]],['outlook','Outlook / Microsoft Graph (OAuth)',[['clientId','Client ID']]],['ics','Calendario por URL ICS',[['url','URL .ics']]],['gmaps','Google Maps',[['key','API Key (restringida)',1]]],['mapbox','Mapbox',[['key','Access Token',1]]],['off','Open Food Facts',[]],['spoon','Spoonacular',[['key','API Key',1]]],['edamam','Edamam',[['key','App ID / Key',1]]],['onesignal','OneSignal',[['appId','App ID']]],['firebase','Firebase',[['cfg','Config del proyecto']]]];
+const ic=(id,k,v)=>{(DB.int[id]=DB.int[id]||{})[k]=v;if(k!=='on')DB.int[id].st='Configurado (sin probar)';save()};
+const rmI=id=>{if(confirm('¿Eliminar configuración?')){delete DB.int[id];save();render()}};
+async function tst(id){const c=DB.int[id]||{};let s;
+ try{if(id==='sheets')await Sync.call('ping',{}),s='Conexión verificada';
+  else if(id==='drive')await Sync.call('driveCheck',{folderId:c.folderId}),s='Carpeta verificada';
+  else if(id==='off'){const r=await fetch('https://world.openfoodfacts.org/api/v2/product/737628064502.json?fields=product_name');s=r.ok?'API pública disponible':'Error HTTP '+r.status}
+  else s='Pendiente: esta integración requiere OAuth, plugin o backend; aún no se puede probar'}
+ catch(e){s='Error: '+e.message}
+ (DB.int[id]=DB.int[id]||{}).st=s;save();render()}
+/* ============ ACCIONES VARIAS ============ */
+const mv=n=>{const c=S.cal;c.m+=n;if(c.m<0){c.m=11;c.y--}if(c.m>11){c.m=0;c.y++}render()};
+const mm=n=>{const d=new Date(+S.mo.slice(0,4),+S.mo.slice(5)-1+n,1);S.mo=iso(d).slice(0,7);render()};
+const newList=()=>{const n=prompt('Nombre de la nueva lista');if(n){S.list=n.trim();openForm('shop',null,{list:S.list})}};
+const arch=()=>{L('shop').filter(x=>x.done&&!x.arch&&(x.list||'Súper')===S.list).forEach(x=>{x.arch=1;upsert('shop',x)});render()};
+const toShop=id=>{const m=L('meals').find(x=>x.id===id);const ls=(m.ing||'').split('\n').map(s=>s.trim()).filter(Boolean);if(!ls.length)return toast('Esta comida no tiene ingredientes');
+ ls.forEach(n=>upsert('shop',{id:uid(),name:n,qty:'',list:S.list||'Súper',cat:'Despensa',done:false}));toast(ls.length+' ingredientes agregados a Compras')};
+const dup=id=>{const m=L('meals').find(x=>x.id===id),d=prompt('Duplicar al día (AAAA-MM-DD)',addD(m.date,1));if(d&&/^\d{4}-\d\d-\d\d$/.test(d)){upsert('meals',{...m,id:uid(),date:d,files:{}});render()}};
+function demo(){const t=today(),p=(m,r)=>upsert(m,{id:uid(),demo:1,...r});p('events',{title:'Cita médica',date:addD(t,2),time:'10:00',who:'both',cat:'Salud',rec:'No'});p('tasks',{title:'Sacar la basura',who:'u1',due:t,prio:'Media',cat:'Hogar',rec:'Semanal'});p('shop',{name:'Leche',qty:'2',list:'Súper',cat:'Lácteos'});p('exp',{type:'Gasto',amount:850,cat:'Supermercado',date:t,who:'u2',note:'Despensa'});p('special',{title:'Cumpleaños de ejemplo',date:addD(t,10),kind:'Cumpleaños',who:'u2'});render()}
+function delDemo(){Object.keys(DB.data).forEach(m=>DB.data[m].filter(x=>x.demo).forEach(x=>enq('delete',m,x)));Object.keys(DB.data).forEach(m=>DB.data[m]=DB.data[m].filter(x=>!x.demo));save();render()}
+function expJ(){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify({...DB,int:{}},null,1)],{type:'application/json'}));a.download='respaldo-hogar.json';a.click()}
+function theme(){const d=DB.dark===null?matchMedia('(prefers-color-scheme:dark)').matches:DB.dark;document.documentElement.dataset.t=d?'d':'l'}
+function render(){const v=S.v;$('#ti').textContent=(NAV.find(n=>n[0]===v)||[0,0,'Nuestro Hogar'])[2];
+ $('#nav').innerHTML=NAV.map(([k,i,t])=>`<button class="${(v===k||(k==='more'&&!NAV.some(n=>n[0]===v)))?'on':''}" onclick="go('${k}')"><b>${i}</b>${t}</button>`).join('');
+ $('#v').innerHTML=(V[v]||V.home)();status();thumbs()}
+theme();render();addEventListener('online',()=>Sync.c()&&sync());
+</script></body></html>
