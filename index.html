@@ -35,6 +35,7 @@ input[type=checkbox]{width:20px;height:20px;flex:none}label{display:block;font-s
 .warn{background:#f5a62322;border-radius:10px;padding:8px;font-size:13px}table{width:100%;border-collapse:collapse;font-size:13px}td,th{border-bottom:1px solid var(--l);padding:5px;text-align:left;vertical-align:top}
 #st.r{background:#d9534f;color:#fff}#st.g{background:#2e9e5b;color:#fff}
 .rimg{width:100%;max-height:230px;object-fit:cover;border-radius:12px;margin-bottom:8px}.rv h2{margin:4px 0}.rv .rm{color:var(--m);margin:0 0 6px}.rv h4{margin:14px 0 4px}.rv ul,.rv ol{padding-left:22px;margin:0;line-height:1.7}.rv li{padding:2px 0}
+.ti{position:relative}.ti .dl{position:absolute;top:4px;right:4px;background:#000a;color:#fff;border:0;border-radius:8px;padding:3px 7px;font-size:14px}
 </style></head><body>
 <header><h1 id="ti">Nuestro Hogar</h1><span id="st" onclick="sync()"></span></header>
 <main id="v"></main><nav id="nav"></nav><div id="modal"></div><div id="toast"></div>
@@ -53,7 +54,7 @@ function toast(t){const e=$('#toast');e.textContent=t;e.style.display='block';cl
 /* ============ ESTADO LOCAL ============ */
 let DB=(()=>{try{const d=JSON.parse(localStorage.getItem(KEY));if(d)return d}catch(e){}
  return{users:[{id:'u1',name:'Yo',color:'#2f80ed'},{id:'u2',name:'Esposa',color:'#e0568a'}],me:'u1',dark:null,data:{},q:[],int:{},last:null}})();
-DB.known=DB.known||{};DB.hc=DB.hc||{};
+DB.known=DB.known||{};DB.hc=DB.hc||{};DB.bc=DB.bc||{};
 function save(){try{localStorage.setItem(KEY,JSON.stringify(DB))}catch(e){toast('Almacenamiento lleno')}status()}
 /* Archivos (fotos/documentos) en IndexedDB: nunca en localStorage ni en Sheets */
 const IDB={p:null,open(){return this.p||(this.p=new Promise((a,b)=>{const r=indexedDB.open('nh_files',1);r.onupgradeneeded=()=>r.result.createObjectStore('f');r.onsuccess=()=>a(r.result);r.onerror=()=>b(r.error)}))},
@@ -95,7 +96,7 @@ function onDay(d){return[...L('events').filter(e=>occ(e,d)===d).map(e=>({...e,k:
 function enq(op,m,rec){DB.q=DB.q.filter(o=>!(o.id===rec.id&&o.sheet===M[m].s));DB.q.push({op,sheet:M[m].s,id:rec.id,rec:op==='delete'?null:rec,t:Date.now()})}
 function upsert(m,rec){const l=L(m),i=l.findIndex(x=>x.id===rec.id),now=new Date().toISOString();let r=rec;
  if(i<0){rec.created=now;rec.by=DB.me;l.push(rec)}else r=Object.assign(l[i],rec);r.updated=now;enq('upsert',m,r);save();return r}
-async function del(m,id){if(!confirm('¿Eliminar este registro? No se puede deshacer.'))return;const x=L(m).find(a=>a.id===id);
+async function del(m,id){const x=L(m).find(a=>a.id===id),dr=Object.values(x.files||{}).some(f=>f.driveId);if(!confirm('¿Eliminar este registro?'+(dr?' El archivo también se enviará a la papelera de Drive al sincronizar.':'')+' No se puede deshacer.'))return;
  for(const k in(x.files||{})){await IDB.del(id+':'+k);const f=x.files[k];if(f.driveId)DB.q.push({op:'deleteFile',sheet:'_Drive',id:f.driveId,rec:null,t:Date.now()})}DB.data[m]=L(m).filter(a=>a.id!==id);enq('delete',m,{id});save();render()}
 function tog(m,id){const x=L(m).find(a=>a.id===id);x.done=!x.done;x.doneAt=x.done?today():'';
  if(m==='tasks'&&x.done&&x.rec&&x.rec!=='No'&&x.due){const n=occ({date:x.due,rec:x.rec},addD(x.due,1));upsert('tasks',{id:uid(),title:x.title,who:x.who,due:n,prio:x.prio,cat:x.cat,rec:x.rec})}
@@ -115,9 +116,9 @@ function openForm(m,id,pre){const d=M[m],x=id?L(m).find(a=>a.id===id):Object.ass
   for(const[k,l,t]of d.f){if(t==='check')r[k]=fd.get(k)==='on';else if(t==='number')r[k]=parseFloat(fd.get(k))||0;else if(t==='file'){const f=fd.get(k);if(f&&f.size){await IDB.put(r.id+':'+k,f);r.files[k]={name:f.name,type:f.type,size:f.size}}}else r[k]=fd.get(k)}
   if(d.on)d.on(r);if(m==='shop'&&!r.list)r.list=S.list||'Súper';upsert(m,r);closeM();render()}}
 const closeM=()=>$('#modal').classList.remove('on'),edit=(m,id)=>openForm(m,id);
-async function openF(id,k){const x=Object.values(DB.data).flat().find(a=>a.id===id),f=x.files[k],b=await IDB.get(id+':'+k);
+async function openF(id,k){const mm_=Object.keys(DB.data).find(q=>L(q).some(a=>a.id===id));const x=Object.values(DB.data).flat().find(a=>a.id===id),f=x.files[k],b=await IDB.get(id+':'+k);
  if(!b){if(f.driveId)return window.open('https://drive.google.com/file/d/'+f.driveId+'/view');return toast('Archivo no disponible en este dispositivo')}
- const u=URL.createObjectURL(b);if(f.type.startsWith('image/')){$('#modal').innerHTML=`<div style="text-align:center"><img src="${u}" style="max-width:100%;max-height:75vh"><p><b>${esc(x.title||'')}</b><br><small>${esc(x.desc||'')}</small></p><button class="s" onclick="closeM()">Cerrar</button></div>`;$('#modal').classList.add('on')}
+ const u=URL.createObjectURL(b);if(f.type.startsWith('image/')){$('#modal').innerHTML=`<div style="text-align:center"><img src="${u}" style="max-width:100%;max-height:75vh"><p><b>${esc(x.title||'')}</b><br><small>${esc(x.desc||'')}</small></p><div class="row" style="justify-content:center"><button class="s" onclick="closeM()">Cerrar</button><button class="s" onclick="closeM();edit('${mm_}','${id}')">✎ Editar</button><button class="s" onclick="closeM();del('${mm_}','${id}')">🗑 Eliminar</button></div></div>`;$('#modal').classList.add('on')}
  else{const a=document.createElement('a');a.href=u;a.download=f.name;a.click()}}
 function thumbs(){document.querySelectorAll('img[data-fk]').forEach(async el=>{try{const b=await IDB.get(el.dataset.fk);if(b)el.src=URL.createObjectURL(b);else if(el.dataset.d)el.src='https://drive.google.com/thumbnail?id='+el.dataset.d}catch(e){}})}
 /* ============ ADAPTADORES (Apps Script / Drive) — no hacen nada sin configurar ============ */
@@ -144,20 +145,20 @@ const who=x=>`<span style="color:${uCol(x.who||x.by)}">●</span>`;
 function card(m,x){const d=M[m],[a,b]=d.r(x);
  return`<div class="card" style="border-left-color:${uCol(x.who||x.by)}">${d.chk?`<input type=checkbox ${x.done?'checked':''} onchange="tog('${m}','${x.id}')">`:''}${d.img&&(x.files||{})[d.img]?`<img class="th" data-fk="${x.id}:${d.img}" data-d="${x.files[d.img].driveId||''}" alt="" onclick="openF('${x.id}','${d.img}')">`:''}<div class="g" onclick="edit('${m}','${x.id}')"><b>${esc(a)}</b>${x.demo?' <span class="tag">DEMO</span>':''}<small>${esc(b)}</small></div>${d.x?d.x(x):''}<button class="ic" onclick="del('${m}','${x.id}')">🗑</button></div>`}
 const SEC=[['ev','Próximos eventos'],['tk','Tareas de hoy'],['gx','Gastos del mes'],['cp','Por comprar'],['cm','Comidas'],['fe','Fechas especiales'],['rc','Receta']];
-const hc=id=>DB.hc[id]||'',goSec=(e,v,m)=>{if(e.target.closest('input,select,button,label,.nogo'))return;go(v,m?{m}:null)};
-const sec=(id,v,t,b,m,c)=>`<div class="box ${c||''}" onclick="goSec(event,'${v}'${m?`,'${m}'`:''})"><h3 style="color:${hc(id)}">${t}</h3>${b}</div>`;
+const tint=h=>{const n=parseInt(h.slice(1),16);return`rgba(${n>>16},${n>>8&255},${n&255},.2)`},bgc=id=>DB.bc[id]?`background:${tint(DB.bc[id])}`:'',hc=id=>DB.hc[id]||'',goSec=(e,v,m)=>{if(e.target.closest('input,select,button,label,.nogo'))return;go(v,m?{m}:null)};
+const sec=(id,v,t,b,m,c)=>`<div class="box ${c||''}" style="${bgc(id)}" onclick="goSec(event,'${v}'${m?`,'${m}'`:''})"><h3 style="color:${hc(id)}">${t}</h3>${b}</div>`;
 const li=t=>(t||'').split('\n').filter(x=>x.trim()).map(x=>`<li>${esc(x)}</li>`).join('');
 const recipeView=r=>`<article class="rv">${(r.files||{}).photo?`<img class="rimg" data-fk="${r.id}:photo" data-d="${r.files.photo.driveId||''}" alt="">`:''}<h2>${r.fav?'★ ':''}${esc(r.name)}</h2><p class="rm">${[r.time&&'⏱ '+r.time+' min',r.portions&&'🍽 '+r.portions+' porciones',r.cat].filter(Boolean).join(' · ')}</p><h4>Ingredientes</h4><ul>${li(r.ing)}</ul><h4>Preparación</h4><ol>${li(r.steps)}</ol></article>`;
 const V={
 home(){const t=today(),ev=[];for(let i=0;i<14;i++)onDay(addD(t,i)).forEach(e=>ev.push([addD(t,i),e]));
- const f=S.hf,tk=L('tasks').filter(x=>(x.due===t||(x.done&&x.doneAt===t))&&(f==='all'||x.who===f||x.who==='both')).sort((a,b)=>!!a.done-!!b.done),mo=t.slice(0,7),
+ const f=S.hf,tk=L('tasks').filter(x=>(x.due===t||(x.done&&x.doneAt===t)||(!x.done&&x.prio==='Alta'))&&(f==='all'||x.who===f||x.who==='both')).sort((a,b)=>!!a.done-!!b.done),mo=t.slice(0,7),
  g=L('exp').filter(x=>(x.date||'').startsWith(mo)&&x.type!=='Ingreso').reduce((a,x)=>a+x.amount,0),ml=L('meals').filter(x=>x.date>=t&&x.date<=addD(t,1)).sort((a,b)=>a.date>b.date?1:-1),
  pe={};L('shop').filter(x=>!x.done&&!x.arch).forEach(x=>{const n=x.list||'Súper';pe[n]=(pe[n]||0)+1});
  const sd=L('special').filter(x=>{const o=occ(sp(x),t);return o&&o<=addD(t,30)}).sort((a,b)=>occ(sp(a),t)>occ(sp(b),t)?1:-1),rs=L('recipes'),r=rs.find(x=>x.id===DB.rs),us=[...DB.users].sort((a,b)=>(b.id===DB.me)-(a.id===DB.me));
  const chips=[['all','Ambos'],...us.map(u=>[u.id,u.name])].map(([k,n])=>`<button class="chip ${f===k?'on':''}" onclick="S.hf='${k}';render()">${esc(n)}</button>`).join('');
  return`<h2 style="margin:6px 0">${new Date().toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'long'})}</h2>
  ${sec('ev','cal','Próximos eventos',ev.slice(0,5).map(([d,e])=>`<div>${e.k==='s'?'🎂':who(e)} <b>${esc(e.title)}</b> <small>${fmt(d)} ${e.time||''}</small></div>`).join('')||empty('Sin eventos próximos'))}
- ${sec('tk','tasks','Tareas de hoy',`<div class="chips">${chips}</div>`+(tk.map(x=>`<div class="row" style="margin:5px 0"><input type="checkbox" ${x.done?'checked':''} onchange="tog('tasks','${x.id}')"><span style="${x.done?'text-decoration:line-through;opacity:.5':''}">${who(x)} ${esc(x.title)}</span></div>`).join('')||empty('Sin tareas para hoy')))}
+ ${sec('tk','tasks','Tareas de hoy',`<div class="chips">${chips}</div>`+(tk.map(x=>`<div class="row" style="margin:5px 0"><input type="checkbox" ${x.done?'checked':''} onchange="tog('tasks','${x.id}')"><span style="${x.done?'text-decoration:line-through;opacity:.5':''}">${who(x)} ${x.prio==='Alta'&&!x.done?'❗ ':''}${esc(x.title)}${x.due&&x.due!==t&&!x.done?` <small>vence ${fmt(x.due)}</small>`:''}</span></div>`).join('')||empty('Sin tareas para hoy')))}
  <div class="row">${sec('gx','exp','Gastos del mes',`<b style="font-size:20px">${money(g)}</b>`,'','sp')}${sec('cp','shop','Por comprar',Object.keys(pe).length?Object.keys(pe).map(n=>`<div>📋 ${esc(n)}: <b>${pe[n]}</b></div>`).join(''):'<small>Nada pendiente</small>','','sp')}</div>
  ${sec('cm','list','Comidas hoy y mañana',ml.map(x=>`<div>${esc(x.slot)}: ${esc(x.name)} <small>${fmt(x.date)}</small></div>`).join('')||empty('Sin comidas planeadas'),'meals')}
  ${sec('fe','list','Fechas especiales (30 días)',sd.map(x=>`<div>${esc(x.title)} <small>${dleft(x)}</small></div>`).join('')||empty('Ninguna próxima'),'special')}
@@ -186,7 +187,7 @@ exp(){const mo=S.mo,l=L('exp').filter(x=>(x.date||'').startsWith(mo)),pm=iso(new
  <button class="s" onclick="go('list',{m:'budgets'})">🎯 Presupuestos por categoría</button>${l.sort((a,b)=>a.date<b.date?1:-1).map(x=>card('exp',x)).join('')}`},
 more(){return`<h2>Más</h2><div class="grid" style="grid-template-columns:repeat(3,1fr)">${[['recipes','🍲','Recetas'],['meals','🍽️','Comidas'],['images','🖼️','Galería'],['docs','📄','Documentos'],['sched','🕒','Horarios'],['special','🎂','Fechas'],['guide','📍','Ubicación y Median'],['int','🔌','Integraciones'],['cfg','⚙️','Ajustes']].map(([v,i,t])=>`<button class="tile" onclick="go('${['recipes','meals','images','docs','sched','special'].includes(v)?'list':v}',${['recipes','meals','images','docs','sched','special'].includes(v)?`{m:'${v}'}`:'null'})"><b>${i}</b>${t}</button>`).join('')}</div>`},
 list(){const m=S.m,d=M[m];if(m==='meals')return V.meals();let l=L(m).slice().reverse(),h=head(d.i+' '+d.t+'s',m);
- if(m==='images')return h+(l.length?`<div class="grid">${l.map(x=>`<div><img data-fk="${x.id}:file" data-d="${(x.files.file||{}).driveId||''}" onclick="openF('${x.id}','file')" alt=""><small>${esc(x.title)}</small></div>`).join('')}</div>`:empty('Sube fotos de menús, avisos o instrucciones'));
+ if(m==='images')return h+(l.length?`<div class="grid">${l.map(x=>`<div class="ti"><button class="dl" onclick="del('images','${x.id}')">🗑</button><img data-fk="${x.id}:file" data-d="${(x.files.file||{}).driveId||''}" onclick="openF('${x.id}','file')" alt=""><small>${esc(x.title)}</small></div>`).join('')}</div>`:empty('Sube fotos de menús, avisos o instrucciones'));
  if(m==='sched')return h+DAYS.map(dd=>{const a=l.filter(x=>x.day===dd).sort((p,q)=>(p.start||'')>(q.start||'')?1:-1);return a.length?`<h3>${dd}</h3>`+a.map(x=>card(m,x)).join(''):''}).join('')||h+empty('Sin horarios');
  if(m==='special')l.sort((a,b)=>occ(sp(a),today())>occ(sp(b),today())?1:-1);
  return h+(l.map(x=>card(m,x)).join('')||empty('Aún no hay registros'))},
@@ -199,7 +200,7 @@ int(){return`<h2>Integraciones</h2><div class="warn">Las credenciales se guardan
 cfg(){return`<h2>Ajustes</h2>${DB.users.map((u,i)=>`<div class="box"><b>Integrante ${i+1}</b><label>Nombre<input value="${esc(u.name)}" onchange="DB.users[${i}].name=this.value;save()"></label><label>Color<input type="color" value="${u.color}" onchange="DB.users[${i}].color=this.value;save()"></label></div>`).join('')}
  <div class="box"><label>Este teléfono es de<select onchange="DB.me=this.value;save()">${DB.users.map(u=>`<option value="${u.id}" ${DB.me===u.id?'selected':''}>${esc(u.name)}</option>`).join('')}</select></label>
  <label>Tema<select onchange="DB.dark=this.value==='auto'?null:this.value==='d';save();theme()"><option value="auto">Automático</option><option value="l" ${DB.dark===false?'selected':''}>Claro</option><option value="d" ${DB.dark?'selected':''}>Oscuro</option></select></label></div>
- <div class="box"><b>Colores de encabezados del inicio</b>${SEC.map(([k,n])=>`<label>${n}<input type="color" value="${DB.hc[k]||'#6b7280'}" onchange="DB.hc['${k}']=this.value;save()"></label>`).join('')}<button class="s" onclick="DB.hc={};save();render()">Restablecer</button></div>
+ <div class="box"><b>Colores del inicio</b><small style="display:block;color:var(--m)">Encabezado y fondo de cada sección</small>${SEC.map(([k,n])=>`<div class="row" style="margin:6px 0"><span class="sp">${n}</span><input type="color" style="width:46px;padding:2px" title="Encabezado" value="${DB.hc[k]||'#6b7280'}" onchange="DB.hc['${k}']=this.value;save()"><input type="color" style="width:46px;padding:2px" title="Fondo" value="${DB.bc[k]||'#ffffff'}" onchange="DB.bc['${k}']=this.value;save()"><button class="ic" title="Quitar fondo" onclick="DB.bc['${k}']='';save();render()">✕</button></div>`).join('')}<button class="s" onclick="DB.hc={};DB.bc={};save();render()">Restablecer</button></div>
  <div class="box row"><button class="s" onclick="demo()">Cargar datos de demostración</button><button class="s" onclick="expJ()">Exportar respaldo</button><button class="s" onclick="delDemo()">Quitar demostración</button></div>`}};
 const INT=[['sheets','Google Sheets + Apps Script',[['url','URL del Apps Script (/exec)'],['sheetId','ID de la hoja'],['token','Token de acceso',1],['apiKey','API Key opcional (solo lectura)',1]]],['drive','Google Drive',[['folderId','ID de carpeta raíz FamilyWall']]],['gcal','Google Calendar (OAuth)',[['clientId','Client ID']]],['outlook','Outlook / Microsoft Graph (OAuth)',[['clientId','Client ID']]],['ics','Calendario por URL ICS',[['url','URL .ics']]],['gmaps','Google Maps',[['key','API Key (restringida)',1]]],['mapbox','Mapbox',[['key','Access Token',1]]],['off','Open Food Facts',[]],['spoon','Spoonacular',[['key','API Key',1]]],['edamam','Edamam',[['key','App ID / Key',1]]],['onesignal','OneSignal',[['appId','App ID']]],['firebase','Firebase',[['cfg','Config del proyecto']]]];
 const ic=(id,k,v)=>{(DB.int[id]=DB.int[id]||{})[k]=v;if(k!=='on')DB.int[id].st='Configurado (sin probar)';save()};
