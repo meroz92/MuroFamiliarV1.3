@@ -124,16 +124,23 @@ function thumbs(){document.querySelectorAll('img[data-fk]').forEach(async el=>{t
 /* ============ ADAPTADORES (Apps Script / Drive) — no hacen nada sin configurar ============ */
 const Sync={c(){const c=DB.int.sheets||{};return c.on&&c.url&&c.token?c:null},
  async call(op,p){const c=this.c();if(!c)throw Error('Pendiente de configurar (Configuración > Integraciones)');
-  const r=await fetch(c.url,{method:'POST',body:JSON.stringify(Object.assign({token:c.token,sheetId:c.sheetId,op},p))});if(!r.ok)throw Error('HTTP '+r.status);const j=await r.json();if(!j.ok)throw Error(j.error||'Error del servicio');return j},
+  const r=await fetch(c.url,{method:'POST',body:JSON.stringify(Object.assign({token:c.token,sheetId:c.sheetId,op,me:DB.me,meName:uName(DB.me)},p))});if(!r.ok)throw Error('HTTP '+r.status);const j=await r.json();if(!j.ok)throw Error(j.error||'Error del servicio');return j},
  async push(){const ops=DB.q.slice();if(!ops.length)return;
   for(const o of ops)if(o.rec&&o.rec.files)for(const k in o.rec.files){const f=o.rec.files[k];if(!f.driveId&&Drive.on()){const b=await IDB.get(o.id+':'+k);if(b){f.driveId=(await Drive.upload(b,f.name,o.sheet)).fileId;const lr=Object.values(DB.data).flat().find(a=>a.id===o.id);if(lr&&lr.files&&lr.files[k])lr.files[k].driveId=f.driveId}}}
-  await this.call('batch',{ops:ops.map(o=>({op:o.op,sheet:o.sheet,id:o.id,record:o.rec}))});DB.q=DB.q.filter(o=>!ops.includes(o));ops.forEach(o=>{if(o.op==='upsert')DB.known[o.id]=1;else delete DB.known[o.id]});DB.last=new Date().toISOString();save()},
+  const j=await this.call('batch',{ops:ops.map(o=>({op:o.op,sheet:o.sheet,id:o.id,record:o.rec}))});this.note=j.notifyError||'';DB.q=DB.q.filter(o=>!ops.includes(o));ops.forEach(o=>{if(o.op==='upsert')DB.known[o.id]=1;else delete DB.known[o.id]});DB.last=new Date().toISOString();save()},
  async pull(){const j=await this.call('pullAll',{});for(const m in M){const rs=(j.data||{})[M[m].s];if(!rs)continue;rs.forEach(r=>{DB.known[r.id]=1;const l=L(m),i=l.findIndex(a=>a.id===r.id);if(DB.q.some(o=>o.id===r.id))return;if(i<0)l.push(r);else if((r.updated||'')>(l[i].updated||''))l[i]=Object.assign(l[i],r)});const ids=new Set(rs.map(r=>r.id));DB.data[m]=L(m).filter(a=>ids.has(a.id)||!DB.known[a.id]||DB.q.some(o=>o.id===a.id))}DB.last=new Date().toISOString();save()}};
 const Drive={on(){const c=DB.int.drive;return Sync.c()&&c&&c.on&&c.folderId},
  async upload(b,name,sheet){const data=await new Promise(a=>{const r=new FileReader();r.onload=()=>a(r.result.split(',')[1]);r.readAsDataURL(b)});return Sync.call('uploadFile',{name,mime:b.type,folder:DB.int.drive.folderId,subfolder:sheet,data})}};
 function enqAll(){for(const m in M)L(m).forEach(r=>{if(!DB.known[r.id]&&!DB.q.some(o=>o.id===r.id))enq('upsert',m,r)})}
+/* Registra este teléfono (ID de suscripción de OneSignal) para que el otro reciba avisos. Requiere el puente JavaScript de Median. */
+async function regDevice(force){if(!Sync.c())return;
+ if(!(window.median&&median.onesignal&&median.onesignal.onesignalInfo)){if(force)throw Error('No se detectó el puente de Median/OneSignal (solo funciona dentro de la app)');return}
+ const i=await median.onesignal.onesignalInfo();
+ if(!i||!i.oneSignalUserId){if(force)throw Error('Este teléfono aún no está suscrito: acepta el permiso de notificaciones');return}
+ const k=DB.me+':'+i.oneSignalUserId;if(!force&&DB.dev===k)return;
+ await Sync.call('registerDevice',{user:DB.me,name:uName(DB.me),subId:i.oneSignalUserId});DB.dev=k;save()}
 async function sync(){if(!Sync.c())return toast('Modo local: configura Apps Script para sincronizar');
- try{toast('Sincronizando…');enqAll();save();await Sync.push();await Sync.pull();toast('Sincronizado');render()}catch(e){toast('Falló la sincronización: '+e.message)}}
+ try{toast('Sincronizando…');enqAll();save();await Sync.push();await Sync.pull();toast(Sync.note?'Sincronizado, pero el aviso falló: '+Sync.note.slice(0,90):'Sincronizado');regDevice().catch(()=>{});render()}catch(e){toast('Falló la sincronización: '+e.message)}}
 function status(){const e=$('#st');if(!e)return;const c=Sync.c();e.textContent=!c?'📱 Solo en este dispositivo':DB.q.length?'⏳ '+DB.q.length+' pendientes':DB.last?'✔ Sincronizado '+new Date(DB.last).toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'}):'☁ Sin sincronizar';e.className=!c?'':(DB.q.length||!DB.last)?'r':'g'}
 /* ============ VISTAS ============ */
 const S={v:'home',cal:{y:new Date().getFullYear(),m:new Date().getMonth(),sel:today(),mode:'Mes'},tf:'Todas',hf:'all',ts:'Pendientes',list:'',hist:0,mo:today().slice(0,7),wk:0};
@@ -198,7 +205,7 @@ guide(){return`<h2>Ubicación, notificaciones y Median.co</h2><div class="warn">
  <div class="box"><h3>Documentación de configuración</h3><ol><li>Crear una hoja de Google con las pestañas: Users, Events, Tasks, ShoppingLists, ShoppingItems, Recipes, MealPlans, Expenses, Budgets, Documents, Images, Schedules, SpecialDays, Settings, ActivityLog.</li><li>Crear en Drive la carpeta FamilyWall/ (Images, Menus, Documents, Recipes, Profiles) y compartirla.</li><li>Publicar un Apps Script (pendiente) que acepte POST JSON con <code>token</code> y las operaciones <code>ping, batch, pullAll, uploadFile, driveCheck</code>.</li><li>Pegar URL, ID y token en Integraciones.</li></ol></div>`},
 int(){return`<h2>Integraciones</h2><div class="warn">Las credenciales se guardan solo en este dispositivo (localStorage no es almacenamiento seguro). En Median usa Secure Storage. No publiques claves en GitHub.</div>`+INT.map(([id,n,fs,t])=>{const c=DB.int[id]||{};return`<div class="box"><div class="row"><b class="sp">${n}</b><label style="margin:0"><input type="checkbox" ${c.on?'checked':''} onchange="ic('${id}','on',this.checked)"></label></div><small>${esc(c.st||'No configurado')}</small>${fs.map(([k,l,p])=>`<label>${l}<input ${p?'type="password"':''} value="${esc(c[k]||'')}" onchange="ic('${id}','${k}',this.value)"></label>`).join('')}<div class="row"><button class="s" onclick="tst('${id}')">Probar conexión</button><button class="s" onclick="rmI('${id}')">Eliminar</button></div></div>`}).join('')},
 cfg(){return`<h2>Ajustes</h2>${DB.users.map((u,i)=>`<div class="box"><b>Integrante ${i+1}</b><label>Nombre<input value="${esc(u.name)}" onchange="DB.users[${i}].name=this.value;save()"></label><label>Color<input type="color" value="${u.color}" onchange="DB.users[${i}].color=this.value;save()"></label></div>`).join('')}
- <div class="box"><label>Este teléfono es de<select onchange="DB.me=this.value;save()">${DB.users.map(u=>`<option value="${u.id}" ${DB.me===u.id?'selected':''}>${esc(u.name)}</option>`).join('')}</select></label>
+ <div class="box"><label>Este teléfono es de<select onchange="DB.me=this.value;save();regDevice().catch(()=>{})">${DB.users.map(u=>`<option value="${u.id}" ${DB.me===u.id?'selected':''}>${esc(u.name)}</option>`).join('')}</select></label>
  <label>Tema<select onchange="DB.dark=this.value==='auto'?null:this.value==='d';save();theme()"><option value="auto">Automático</option><option value="l" ${DB.dark===false?'selected':''}>Claro</option><option value="d" ${DB.dark?'selected':''}>Oscuro</option></select></label></div>
  <div class="box"><b>Colores del inicio</b><small style="display:block;color:var(--m)">Encabezado y fondo de cada sección</small>${SEC.map(([k,n])=>`<div class="row" style="margin:6px 0"><span class="sp">${n}</span><input type="color" style="width:46px;padding:2px" title="Encabezado" value="${DB.hc[k]||'#6b7280'}" onchange="DB.hc['${k}']=this.value;save()"><input type="color" style="width:46px;padding:2px" title="Fondo" value="${DB.bc[k]||'#ffffff'}" onchange="DB.bc['${k}']=this.value;save()"><button class="ic" title="Quitar fondo" onclick="DB.bc['${k}']='';save();render()">✕</button></div>`).join('')}<button class="s" onclick="DB.hc={};DB.bc={};save();render()">Restablecer</button></div>
  <div class="box row"><button class="s" onclick="demo()">Cargar datos de demostración</button><button class="s" onclick="expJ()">Exportar respaldo</button><button class="s" onclick="delDemo()">Quitar demostración</button></div>`}};
@@ -208,6 +215,7 @@ const rmI=id=>{if(confirm('¿Eliminar configuración?')){delete DB.int[id];save(
 async function tst(id){const c=DB.int[id]||{};let s;
  try{if(id==='sheets')await Sync.call('ping',{}),s='Conexión verificada';
   else if(id==='drive')await Sync.call('driveCheck',{folderId:c.folderId}),s='Carpeta verificada';
+  else if(id==='onesignal'){await regDevice(1);const r=await Sync.call('testPush',{});s='Aviso de prueba enviado a '+r.sent+' teléfono(s)'}
   else if(id==='off'){const r=await fetch('https://world.openfoodfacts.org/api/v2/product/737628064502.json?fields=product_name');s=r.ok?'API pública disponible':'Error HTTP '+r.status}
   else s='Pendiente: esta integración requiere OAuth, plugin o backend; aún no se puede probar'}
  catch(e){s='Error: '+e.message}
@@ -230,5 +238,6 @@ function render(){const v=S.v;$('#ti').textContent=(NAV.find(n=>n[0]===v)||[0,0,
  $('#nav').innerHTML=NAV.map(([k,i,t])=>`<button class="${(v===k||(k==='more'&&!NAV.some(n=>n[0]===v)))?'on':''}" onclick="go('${k}')"><b>${i}</b>${t}</button>`).join('');
  $('#v').innerHTML=(V[v]||V.home)();status();thumbs()}
 theme();render();addEventListener('online',()=>Sync.c()&&sync());
+setTimeout(()=>regDevice().catch(()=>{}),2500);
 if(Sync.c()&&(DB.q.length||!DB.last||Date.now()-new Date(DB.last)>3e5))sync();
 </script></body></html>
